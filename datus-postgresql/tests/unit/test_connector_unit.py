@@ -544,6 +544,30 @@ def _df(rows, columns):
     return pd.DataFrame(rows, columns=columns)
 
 
+def test_get_schemas_uses_requested_database_and_handles_empty_result():
+    """Schema lookup must query the requested database and tolerate empty metadata."""
+    connector = _make_pg_connector_for_metadata(database_name="ccks_fund")
+    empty = _df([], [])
+    connector._execute_pandas = MagicMock(return_value=empty)
+
+    result = connector.get_schemas(database_name="databasetest")
+
+    assert result == []
+    connector._execute_pandas.assert_called_once()
+    assert connector._execute_pandas.call_args.kwargs["database_name"] == "databasetest"
+
+
+def test_get_schemas_filters_system_schemas():
+    connector = _make_pg_connector_for_metadata()
+    df = _df(
+        [("public",), ("information_schema",), ("pg_catalog",)],
+        ["schema_name"],
+    )
+    connector._execute_pandas = MagicMock(return_value=df)
+
+    assert connector.get_schemas(database_name="testdb") == ["public"]
+
+
 def test_get_schema_strict_match_hits_no_fallback():
     """Exact case match returns rows from first query and never executes the lower() fallback."""
     connector = _make_pg_connector_for_metadata()
